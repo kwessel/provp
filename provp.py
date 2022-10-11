@@ -16,22 +16,22 @@ parser.add_argument("-d", "--debug", dest="debug", default=False,
 
 #--proqa-host
 parser.add_argument("--proqa-host", dest="proqa_host",
-                    default="localhost", action="store_true",
+                    default="localhost",
                     help="hostname where ProQA is running")
 
 #--proqa-port
 parser.add_argument("--proqa-port", dest="proqa_port",
-                    default=5000, action="store_true",
+                    default=5000, type=int,
                     help="port where ProQA is running")
 
 #--provp-host
 parser.add_argument("--provp-host", dest="provp_host",
-                    default="0.0.0.0", action="store_true",
+                    default="0.0.0.0",
                     help="address to listen on for connections from CAD")
 
 #--provp-port
-parser.add_argument("--provp-port", dest="provp_port",
-                    default=5001, action="store_true",
+parser.add_argument("--provp-port", dest="provp_port", type=int,
+                    default=5001,
                     help="port to listen on for connections from CAD")
 
 #parse arguments
