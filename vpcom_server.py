@@ -9,11 +9,11 @@ import argparse
 CAD_MSG_TERMINATOR = "</conn>"
 MAX_OPERATORS = 10
 CAD_PORT = 5001
-VPCOMM_PORT = 5000
+VPCOM_PORT = 5000
 
 # Define command-line arguments
 parser = argparse.ArgumentParser(
-    description="Relay CAD messages to vpcomm clients"
+    description="Relay CAD messages to vpcom clients"
     )
 
 #-d / --debug
@@ -30,15 +30,15 @@ parser.add_argument("--cad-port", dest="cad_port",
                     default=CAD_PORT, type=int,
                     help="port where CAD will send messages")
 
-#--vpcomm-host
-parser.add_argument("--vpcomm-host", dest="vpcomm_host",
+#--vpcom-host
+parser.add_argument("--vpcom-host", dest="vpcom_host",
                     default="0.0.0.0",
-                    help="IP address that vpcomm clients connect to")
+                    help="IP address that vpcom clients connect to")
 
-#--vpcomm-port
-parser.add_argument("--vpcomm-port", dest="vpcomm_port", type=int,
-                    default=VPCOMM_PORT,
-                    help="port to listen on for connections from vpcomm clients")
+#--vpcom-port
+parser.add_argument("--vpcom-port", dest="vpcom_port", type=int,
+                    default=VPCOM_PORT,
+                    help="port to listen on for connections from vpcom clients")
 
 #parse arguments
 options = parser.parse_args()
@@ -51,10 +51,10 @@ if debug:
 
 cad_host = options.cad_host
 cad_port = options.cad_port
-vpcomm_host = options.vpcomm_host
-vpcomm_port = options.vpcomm_port
+vpcom_host = options.vpcom_host
+vpcom_port = options.vpcom_port
 
-debug and print(f"starting up on {cad_host}:{cad_port} and {vpcomm_host}:{vpcomm_port}", file=sys.stderr)
+debug and print(f"starting up on {cad_host}:{cad_port} and {vpcom_host}:{vpcom_port}", file=sys.stderr)
 
 try:
     # Create a socket, bind to the port, and start listening for connections
@@ -66,14 +66,14 @@ except OSError as e:
 
 try:
     # Create a socket, bind to the port, and start listening for connections
-    vpcomm_sock = socket.create_server((vpcomm_host, vpcomm_port), backlog=0)
-    print(f"Listening for connections from VPComm clients  on {vpcomm_host}:{vpcomm_port}")
+    vpcom_sock = socket.create_server((vpcom_host, vpcom_port), backlog=0)
+    print(f"Listening for connections from VPCom clients  on {vpcom_host}:{vpcom_port}")
 except OSError as e:
-    print(f"Failed to create server on port {vpcomm_port}: {e}")
+    print(f"Failed to create server on port {vpcom_port}: {e}")
     sys.exit(1)
 
 # Create list of connections to listen on
-connections = [cad_sock, vpcomm_sock]
+connections = [cad_sock, vpcom_sock]
 
 # Create dictionary to map operator numbers to open sockets
 operators = {}
@@ -168,17 +168,17 @@ while True:
                     break
 
         # New connection from a client
-        if vpcomm_sock in rlist:
-            vpcomm_conn, client_address = vpcomm_sock.accept()
-            vpcomm_conn.settimeout(1)
+        if vpcom_sock in rlist:
+            vpcom_conn, client_address = vpcom_sock.accept()
+            vpcom_conn.settimeout(1)
             print(f"New client connection from {client_address[0]}")
 
             try:
-                data = vpcomm_conn.recv(16)
+                data = vpcom_conn.recv(16)
             except socket.timeout:
                 print("No data received from client before timeout, closing connection")
-                vpcomm_conn.shutdown(socket.SHUT_RDWR)
-                vpcomm_conn.close()
+                vpcom_conn.shutdown(socket.SHUT_RDWR)
+                vpcom_conn.close()
                 continue
 
             if data:
@@ -188,20 +188,20 @@ while True:
                 if op.isdigit():
                     if op in operators:
                         print(f"Rejecting connection from {client_address[0]} identified as already connected operator {op}")
-                        vpcomm_conn.sendall("Operator already connected\n".encode('utf-8'))
-                        vpcomm_conn.shutdown(socket.SHUT_RDWR)
-                        vpcomm_conn.close()
+                        vpcom_conn.sendall("Operator already connected\n".encode('utf-8'))
+                        vpcom_conn.shutdown(socket.SHUT_RDWR)
+                        vpcom_conn.close()
                     else:
                         print(f"Operator {op} connected from {client_address[0]}")
-                        vpcomm_conn.sendall("OK\n".encode('utf-8'))
+                        vpcom_conn.sendall("OK\n".encode('utf-8'))
 
                         # Record this open connection and the associated operator
-                        operators[op] = vpcomm_conn
+                        operators[op] = vpcom_conn
                         connections.append(operators[op])
                 else:
                     print(f"Rejecting connection from {client_address[0]} that sent garbage")
-                    vpcomm_conn.shutdown(socket.SHUT_RDWR)
-                    vpcomm_conn.close()
+                    vpcom_conn.shutdown(socket.SHUT_RDWR)
+                    vpcom_conn.close()
 
             else:
                 print(f"Client on {client_address[0]} closed connection before identifying itself")
@@ -221,12 +221,12 @@ while True:
                         pass
                     break
 
-        if vpcomm_sock in connections and len(operators) >= MAX_OPERATORS:
+        if vpcom_sock in connections and len(operators) >= MAX_OPERATORS:
             print (f"Reached max number of operator connections {MAX_OPERATORS}, not accepting more")
-            connections.remove(vpcomm_sock)
-        elif vpcomm_sock not in connections and len(operators) < MAX_OPERATORS:
+            connections.remove(vpcom_sock)
+        elif vpcom_sock not in connections and len(operators) < MAX_OPERATORS:
             print (f"Connections below max number of operator connections {MAX_OPERATORS}, accepting connections again")
-            connections.append(vpcomm_sock)
+            connections.append(vpcom_sock)
 
     except OSError as e:
         print(f"Ignoring unhandled socket or IO error: {e}")
