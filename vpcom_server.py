@@ -6,7 +6,7 @@ import sys
 import argparse
 
 # Global constants
-CAD_MSG_TERMINATOR = "</conn>"
+CAD_MSG_TERMINATOR = "</comm>"
 MAX_OPERATORS = 10
 CAD_PORT = 5001
 VPCOM_PORT = 5000
