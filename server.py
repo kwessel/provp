@@ -8,7 +8,7 @@ import sys
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # Bind the socket to the port
-server_address = ('localhost', 5000)
+server_address = ('localhost', 5100)
 print(f"starting up on {server_address[0]} port {server_address[1]}", file=sys.stderr)
 sock.bind(server_address)
 
@@ -17,11 +17,11 @@ sock.listen(1)
 
 while True:
     # Wait for a connection
-    print("waiting for a connection", file=sys.stderr)
-    connection, client_address = sock.accept()
-    print(f"connection from {client_address}", file=sys.stderr)
-
     try:
+        print("waiting for a connection", file=sys.stderr)
+        connection, client_address = sock.accept()
+        print(f"connection from {client_address}", file=sys.stderr)
+
         # Receive the data in small chunks and retransmit it
         while True:
             rlist = select.select([connection], [], [])[0]
@@ -36,7 +36,10 @@ while True:
                     print(f"no more data from {client_address}", file=sys.stderr)
                     break
             
-    finally:
-        # Clean up the connection
-        connection.close()
-        print("Connection closed")
+    except KeyboardInterrupt:
+        print("Received interrupt signal, exiting")
+        break
+
+# Clean up the connection
+connection.close()
+print("Connection closed")
