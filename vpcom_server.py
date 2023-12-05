@@ -107,7 +107,15 @@ while True:
 
                     # Have we received the destination operator yet?
                     if not recipient:
-                        recipient = data.decode('utf-8').rstrip()
+                        input = data.decode('utf-8').rstrip()
+
+                        # Split on newline
+                        input_lines = input.split("\n", maxsplit=1)
+                        recipient = input_lines[0]
+
+                        # If there was more after the newline, use it for start of message
+                        if len(input_lines) == 2:
+                            cad_msg = input_lines[1]
 
                         # Did we get a number?
                         if not recipient.isdigit():
