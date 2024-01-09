@@ -145,9 +145,9 @@ while True:
         #   Connection From CAD. Read entire string, route based on leading group id:  m,f,p  - sent from cad3
         # __________________________________________________________________________________
         if sock_fd in rlist:
-        
             cad_conn, client_address = sock.accept()
-            debug and print(f"New connection from client: {client_address[0]}")
+            cad_conn.settimeout(1)
+            debug and print(f"New CAD connection from client: {client_address[0]}")
 
             # Keep reading from client until there's no more to read
             sfulldata=""
@@ -187,29 +187,43 @@ while True:
                         cad_conn.close()
                         break
 
+                except socket.timeout:
+                    debug and print("Incomplete data received from CAD before timeout, closing connection")
+                    cad_conn.shutdown(socket.SHUT_RDWR)
+                    cad_conn.close()
+                    break
+
                 except OSError as e:
                     print(f"Error exchanging communications between CAD and ProQA: {e}")
 
         # medical - post to cad via catchpro_url
         if med_conn in rlist:
+            debug and print("Receiving message from ProQA Med")
+            med_conn.settimeout(1)
             med_msg = ""
 
             while True:
-                data = med_conn.recv(16)
+                try:
+                    data = med_conn.recv(16)
+                except socket.timeout:
+                    debug and print("Incomplete data received from ProQA Med before timeout, dropping partial message")
+                    break
 
                 if data:
-                    debug and print(f"received from ProQA: {data}")
+                    debug and print(f"received from ProQA Med: {data}")
                     med_msg += data.decode('utf-8')
 
-                    # Is this the end of the medical message?
-                    if endtext in med_msg:
-                        break
+                # Is this the end of the medical message?
+                if endtext in med_msg:
+                    break
 
                 # Or see that the server closed the connection
                 else:
-                    debug and print("ProQA med has closed the connection")
+                    debug and print("ProQA Med has closed the connection")
                     sock.close()
                     sys.exit(3)
+
+            med_conn.settimeout(None)
 
             if med_msg:
                 debug and print(f"posting med msg to catchpro_url: {med_msg}")
@@ -224,13 +238,19 @@ while True:
 
         # fire - post to cad via catchpro_url
         if fir_conn in rlist:
+            debug and print("Receiving message from ProQA Fire")
+            fir_conn.settimeout(1)
             fir_msg = ""
 
             while True:
-                data = fir_conn.recv(16)
+                try:
+                    data = fir_conn.recv(16)
+                except socket.timeout:
+                    debug and print("Incomplete data received from ProQA Fire before timeout, dropping partial message")
+                    break
 
                 if data:
-                    debug and print(f"received from ProQA: {data}")
+                    debug and print(f"received from ProQA Fire: {data}")
                     fir_msg += data.decode('utf-8')
 
                     # Is this the end of the medical message?
@@ -242,6 +262,8 @@ while True:
                     debug and print("ProQA Fire has closed the connection")
                     sock.close()
                     sys.exit(3)
+
+            fir_conn.settimeout(None)
 
             if fir_msg:
                 debug and print(f"posting fire msg to catchpro_url: {fir_msg}")
@@ -256,13 +278,19 @@ while True:
                     
         # police - post to cad via catchpro_url
         if pol_conn in rlist:
+            debug and print("Receiving message from ProQA Police")
+            pol_conn.settimeout(1)
             pol_msg = ""
 
             while True:
-                data = pol_conn.recv(16)
+                try:
+                    data = pol_conn.recv(16)
+                except socket.timeout:
+                    debug and print("Incomplete data received from ProQA Police before timeout, dropping partial message")
+                    break
 
                 if data:
-                    debug and print(f"received from ProQA: {data}")
+                    debug and print(f"received from ProQA police: {data}")
                     pol_msg += data.decode('utf-8')
 
                     # Is this the end of the police message?
@@ -275,6 +303,7 @@ while True:
                     sock.close()
                     sys.exit(3)
 
+            pol_conn.settimeout(None)
             if pol_msg:
                 debug and print(f"posting police msg to catchpro_url: {pol_msg}")
                 form_data = {'msg': pol_msg}
