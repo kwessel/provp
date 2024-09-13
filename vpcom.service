@@ -1,7 +1,0 @@
-[Unit]
-Description=VPComm server for handling communications between CAD and dispatchers
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/vpcomm_server.py
-Restart=on-failure
