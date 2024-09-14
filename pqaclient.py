@@ -126,9 +126,14 @@ except OSError as e:
     print(f"Failed to connect to ProQA Police on {polhost}:{polport}: {e}")
     sys.exit(1)
     
-# _________________________________________________________________________________________
-#                Setup rlist of connections:  medical, fire, police, and pqaserver
-# _________________________________________________________________________________________
+# Create empty buffers for receiving messages
+pqaserver_msg = "".encode('utf-8')
+med_msg = ""
+fir_msg = ""
+pol_msg = ""
+
+# set exit code to return to OS on normal exit
+exit_code=0
 
 # Wait for a connection
 pqaserver_conn = None
@@ -140,6 +145,9 @@ while True:
 
     try:
         if not pqaserver_conn:
+            # In case this is a reconnect and we lost connection after a
+            # partial message, clear the buffer
+            pqaserver_msg = "".encode('utf-8')
             print(f"Connecting to pqaserver on {pqaserverhost}:{pqaserverport}...")
 
         while not pqaserver_conn:
@@ -164,10 +172,10 @@ while True:
             except OSError as e:
                 print(f"Unable to connect to pqaserver: {e}")
 
-                if vpserver_conn:
-                    vpserver_conn.shutdown(socket.SHUT_RDWR)
-                    vpserver_conn.close()
-                    vpserver_conn = None
+                if pqaserver_conn:
+                    pqaserver_conn.shutdown(socket.SHUT_RDWR)
+                    pqaserver_conn.close()
+                    pqaserver_conn = None
 
                 print("Retrying...")
                 time.sleep(5)
@@ -180,173 +188,176 @@ while True:
         #   Connection From pqaserver. Read entire string, route based on leading group id:  m,f,p  - sent from cad3
         # __________________________________________________________________________________
         if pqaserver_conn in rlist:
-            # Keep reading from client until there's no more to read
-            fulldata = "".encode('utf-8')
-            while True:
-                try:
-                    data = pqaserver_conn.recv(16)
+            try:
+                data = pqaserver_conn.recv(16)
 
-                    if data:
-                        fulldata+=data
-                        debug and print(f"Received from pqaserver: {data}")
+                if data:
+                    pqaserver_msg+=data
+                    debug and print(f"Received from pqaserver: {data}")
 
-                        # Did we receive the message terminator?
-                        if endtext in fulldata.decode('utf-8'):
-                            groupid=fulldata[0:1].decode("utf-8") 
-                            senddata=fulldata[1:]
-                        
-                            debug and print(f"Received full from CAD: {fulldata}")
-                            debug and print(f"Groupid: {groupid}")
-                            debug and print(f"Senddata: {senddata}")
-                        
-                            # send to medical
-                            if groupid=='m':
-                                try:
-                                    med_conn.sendall(senddata)
-                                except OSError as e:
-                                    debug and print(f"Error sending to ProQA Medical: {e}")
-                                    pqaserver_conn.sendall("NO\n".encode('utf-8'))
-                                    break
+                    # Did we receive the message terminator?
+                    if endtext in pqaserver_msg.decode('utf-8'):
+                        # Parse out group ID in first char from rest of message
+                        groupid=pqaserver_msg[0:1].decode("utf-8") 
+                        senddata=pqaserver_msg[1:]
 
-                                pqaserver_conn.sendall("OK\n".encode('utf-8'))
-
-                            # send to fire
-                            if groupid=='f':
-                                try:
-                                    fir_conn.sendall(senddata)
-                                except OSError as e:
-                                    debug and print(f"Error sending to ProQA Fire: {e}")
-                                    pqaserver_conn.sendall("NO\n".encode('utf-8'))
-                                    break
-
-                                pqaserver_conn.sendall("OK\n".encode('utf-8'))
-
-                            # send to police
-                            if groupid=='p':
-                                try:
-                                    pol_conn.sendall(senddata)
-                                except OSError as e:
-                                    debug and print(f"Error sending to ProQA Police: {e}")
-                                    pqaserver_conn.sendall("NO\n".encode('utf-8'))
-                                    break
-
-                                pqaserver_conn.sendall("OK\n".encode('utf-8'))
-                            else:
+                        debug and print(f"Received full from CAD: {pqaserver_msg}")
+                        debug and print(f"Groupid: {groupid}")
+                        debug and print(f"Senddata: {senddata}")
+                    
+                        # Clear the buffer
+                        pqaserver_msg = "".encode('utf-8')
+                    
+                        # send to medical
+                        if groupid=='m':
+                            try:
+                                med_conn.sendall(senddata)
+                            except OSError as e:
+                                debug and print(f"Error sending to ProQA Medical: {e}")
                                 pqaserver_conn.sendall("NO\n".encode('utf-8'))
-                            break
-                        
-                    # Or see that the client closed the connection
-                    else:
-                        raise socket.error("Lost connection to pqaserver, attempting reconnect")
+                                exit_code=3
+                                break
 
+                            pqaserver_conn.sendall("OK\n".encode('utf-8'))
 
-                except OSError as e:
-                    print(f"Error receiving data from pqaserver: {e}")
-                    print("Attempting to reconnect to pqaserver")
-                    pqaserver_conn.shutdown(socket.SHUT_RDWR)
-                    pqaserver_conn.close()
-                    pqaserver_conn = None
-                    break
+                        # send to fire
+                        if groupid=='f':
+                            try:
+                                fir_conn.sendall(senddata)
+                            except OSError as e:
+                                debug and print(f"Error sending to ProQA Fire: {e}")
+                                pqaserver_conn.sendall("NO\n".encode('utf-8'))
+                                exit_code=3
+                                break
+
+                            pqaserver_conn.sendall("OK\n".encode('utf-8'))
+
+                        # send to police
+                        if groupid=='p':
+                            try:
+                                pol_conn.sendall(senddata)
+                            except OSError as e:
+                                debug and print(f"Error sending to ProQA Police: {e}")
+                                pqaserver_conn.sendall("NO\n".encode('utf-8'))
+                                exit_code=3
+                                break
+
+                            pqaserver_conn.sendall("OK\n".encode('utf-8'))
+                        else:
+                            pqaserver_conn.sendall("NO\n".encode('utf-8'))
+                    
+                # Or see that the client closed the connection
+                else:
+                    raise socket.error("Lost connection to pqaserver, attempting reconnect")
+                    continue
+
+            except OSError as e:
+                print(f"Error receiving data from pqaserver: {e}")
+                print("Attempting to reconnect to pqaserver")
+                pqaserver_conn.shutdown(socket.SHUT_RDWR)
+                pqaserver_conn.close()
+                pqaserver_conn = None
+                continue
 
         # medical - post to cad via catchpro_url
         if med_conn in rlist:
-            med_msg = ""
+            data = med_conn.recv(16)
 
-            while True:
-                data = med_conn.recv(16)
+            if data:
+                debug and print(f"received from ProQA Med: {data}")
+                med_msg += data.decode('utf-8')
 
-                if data:
-                    debug and print(f"received from ProQA Med: {data}")
-                    med_msg += data.decode('utf-8')
+                # Is this the end of the medical message?
+                if endtext in med_msg:
+                    debug and print(f"posting med msg to catchpro_url: {med_msg}")
 
-                    # Is this the end of the medical message?
-                    if endtext in med_msg:
-                        break
+                    # Get the form post ready
+                    form_data = {'msg': med_msg}
 
-                # Or see that the server closed the connection
-                else:
-                    debug and print("ProQA med has closed the connection")
-                    pqaserver_conn.shutdown(socket.SHUT_RDWR)
-                    pqaserver_conn.close()
-                    sys.exit(3)
+                    # Clear the buffer
+                    med_msg = ""
 
-            if med_msg:
-                debug and print(f"posting med msg to catchpro_url: {med_msg}")
-                form_data = {'msg': med_msg}
-                try:
-                    resp = requests.post(catchpro, data=form_data,
-                           timeout=catchprotimeout)
-                    debug and print(f"HTTP post returned status {resp.status_code}")
+                    # Post the form data to catchpro
+                    try:
+                        resp = requests.post(catchpro, data=form_data,
+                               timeout=catchprotimeout)
+                        debug and print(f"HTTP post returned status {resp.status_code}")
 
-                except RequestException as e:
-                    debug and print(f"Failed to post to {catchpro_url}: {e}")
+                    except RequestException as e:
+                        debug and print(f"Failed to post to {catchpro_url}: {e}")
+
+            # Or see that the server closed the connection
+            else:
+                debug and print("ProQA med has closed the connection")
+                exit_code=3
+                break
 
         # fire - post to cad via catchpro_url
         if fir_conn in rlist:
-            fir_msg = ""
+            data = fir_conn.recv(16)
 
-            while True:
-                data = fir_conn.recv(16)
+            if data:
+                debug and print(f"received from ProQA Fire: {data}")
+                fir_msg += data.decode('utf-8')
 
-                if data:
-                    debug and print(f"received from ProQA Fire: {data}")
-                    fir_msg += data.decode('utf-8')
+                # Is this the end of the fire message?
+                if endtext in fir_msg:
+                    debug and print(f"posting fire msg to catchpro_url: {fir_msg}")
 
-                    # Is this the end of the fire message?
-                    if endtext in fir_msg:
-                        break
+                    # Get the form post ready
+                    form_data = {'msg': fir_msg}
 
-                # Or see that the server closed the connection
-                else:
-                    debug and print("ProQA fire has closed the connection")
-                    pqaserver_conn.shutdown(socket.SHUT_RDWR)
-                    pqaserver_conn.close()
-                    sys.exit(3)
+                    # Clear the buffer
+                    fir_msg = ""
 
-            if fir_msg:
-                debug and print(f"posting fire msg to catchpro_url: {fir_msg}")
-                form_data = {'msg': fir_msg}
-                try:
-                    resp = requests.post(catchpro, data=form_data,
-                           timeout=catchprotimeout)
-                    debug and print(f"HTTP post returned status {resp.status_code}")
+                    # Post the form data to catchpro
+                    try:
+                        resp = requests.post(catchpro, data=form_data,
+                               timeout=catchprotimeout)
+                        debug and print(f"HTTP post returned status {resp.status_code}")
 
-                except RequestException as e:
-                    debug and print(f"Failed to post to {catchpro_url}: {e}")
-                    
+                    except RequestException as e:
+                        debug and print(f"Failed to post to {catchpro_url}: {e}")
+
+            # Or see that the server closed the connection
+            else:
+                debug and print("ProQA fire has closed the connection")
+                exit_code=3
+                break
+
         # police - post to cad via catchpro_url
         if pol_conn in rlist:
-            pol_msg = ""
+            data = med_conn.recv(16)
 
-            while True:
-                data = pol_conn.recv(16)
+            if data:
+                debug and print(f"received from ProQA Police: {data}")
+                pol_msg += data.decode('utf-8')
 
-                if data:
-                    debug and print(f"received from ProQA police: {data}")
-                    pol_msg += data.decode('utf-8')
+                # Is this the end of the police message?
+                if endtext in pol_msg:
+                    debug and print(f"posting police msg to catchpro_url: {pol_msg}")
 
-                    # Is this the end of the police message?
-                    if endtext in pol_msg:
-                        break
+                    # Get the form post ready
+                    form_data = {'msg': pol_msg}
 
-                # Or see that the server closed the connection
-                else:
-                    debug and print("ProQA police has closed the connection")
-                    pqaserver_conn.shutdown(socket.SHUT_RDWR)
-                    pqaserver_conn.close()
-                    sys.exit(3)
+                    # Clear the buffer
+                    pol_msg = ""
 
-            if pol_msg:
-                debug and print(f"posting police msg to catchpro_url: {pol_msg}")
-                form_data = {'msg': pol_msg}
-                try:
-                    resp = requests.post(catchpro, data=form_data,
-                           timeout=catchprotimeout)
-                    debug and print(f"HTTP post returned status {resp.status_code}")
+                    # Post the form data to catchpro
+                    try:
+                        resp = requests.post(catchpro, data=form_data,
+                               timeout=catchprotimeout)
+                        debug and print(f"HTTP post returned status {resp.status_code}")
 
-                except RequestException as e:
-                    debug and print(f"Failed to post to {catchpro_url}: {e}")
-        
+                    except RequestException as e:
+                        debug and print(f"Failed to post to {catchpro_url}: {e}")
+
+            # Or see that the server closed the connection
+            else:
+                debug and print("ProQA police has closed the connection")
+                exit_code=3
+                break
+
     except KeyboardInterrupt:
         debug and print("Received interrupt signal, exiting")
         break
@@ -358,4 +369,4 @@ for f in [pqaserver_conn,med_conn,fir_conn,pol_conn]:
 
 debug and print("Connection closed")
 
-sys.exit(0)
+sys.exit(exit_code)
