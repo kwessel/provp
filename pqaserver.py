@@ -26,7 +26,7 @@ parser.add_argument("-d", "--debug", dest="debug", default=False,
 
 #--cad-host
 parser.add_argument("--cad-host", dest="cad_host",
-                    default="localhost",
+                    default="0.0.0.0",
                     help="IP address where CAD will send messages")
 
 #--cad-port
