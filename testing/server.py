@@ -8,7 +8,7 @@ import sys
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # Bind the socket to the port
-server_address = ('localhost', 5100)
+server_address = ('localhost', 6000)
 print(f"starting up on {server_address[0]} port {server_address[1]}", file=sys.stderr)
 sock.bind(server_address)
 

@@ -43,24 +43,33 @@ while True:
                 # Receive the data in small chunks and retransmit it
                 while True:
                     data = c.recv(16)  # Receive data in chunks of 16 bytes
-                    fulldata += data  # Accumulate the received data
 
-                    if eomstring in data.decode('utf-8'):
-                        print("End of Msg received.")
-                        break  # Exit the loop when no more data is received
+                    if data:
+                        fulldata += data  # Accumulate the received data
 
-                    print(f"received chunk: {data}", file=sys.stderr)
+                        if eomstring in data.decode('utf-8'):
+                            print("End of Msg received.")
 
-                # Decode the accumulated bytes data and print it as a string
-                if fulldata:
-                    print(f"Complete message: {fulldata.decode('utf-8')}", file=sys.stderr)
+                            # Decode the accumulated bytes data and print it as a string
+                            if fulldata:
+                                print(f"Complete message: {fulldata.decode('utf-8')}", file=sys.stderr)
 
-                sendresponse='From Pqsim51: '.encode('utf-8')+fulldata+eomstring.encode('utf-8')
-                try:
-                    c.sendall(sendresponse)  
-                except OSError as e:
-                    print(f"Error sending response: {e}")
-                
+                            sendresponse='From Pqsim51: '.encode('utf-8')+fulldata+eomstring.encode('utf-8')
+                            try:
+                                c.sendall(sendresponse)  
+                            except OSError as e:
+                                print(f"Error sending response: {e}")
+                            
+                            break  # Exit the loop
+
+                        print(f"received chunk: {data}", file=sys.stderr)
+
+                    else:
+                        print("Connection closed by client")
+                        c.close()
+                        connections.remove(c)
+                        break
+
     except KeyboardInterrupt:
         print("Received interrupt signal, exiting")
         break

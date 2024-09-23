@@ -1,0 +1,7 @@
+[Unit]
+Description=pqserver for handling communications between CAD and dispatchers
+After=network.target
+
+[Service]
+ExecStart=/home/brownlee/services/pqserver.py
+Restart=on-failure
