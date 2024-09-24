@@ -185,14 +185,17 @@ if __name__ == "__main__":
 
                     if data:
                         debug and print(f"received from CAD: {data}")
+                        decoded = data.decode('utf-8')
                         
                         # Have we received the station# yet?
                         if not recipient:
-                            # Read first line of input containing one or more digits
-                            recipient = data.decode('utf-8').rstrip()  # remove spaces and \n
+                            # If input contains newline, split into station and message
+                            if "\n" in decoded:
+                                recipient = decoded[:decoded.index("\n")]
+                                cadmsg = decoded[decoded.index("\n")+1:]
 
                             # Did we get a number?  first line from cad is station# 1-9 and \n
-                            if not recipient.isdigit():
+                            if not recipient or not recipient.isdigit():
                                 print(f"Received invalid operator ID from CAD: {recipient}")
                                 cadcon.shutdown(socket.SHUT_RDWR)
                                 cadcon.close()
@@ -214,36 +217,36 @@ if __name__ == "__main__":
                         else:
                             cadmsg += data.decode('utf-8')
                             
-                            # Is this the end of the message?
-                            if eomstring in cadmsg:
-                                debug and print(f"Sending to {recipient}: {cadmsg}")
-                                
-                                operators[recipient].sendall(cadmsg.encode('utf-8'))
+                        # Is this the end of the message?
+                        if eomstring in cadmsg:
+                            debug and print(f"Sending to {recipient}: {cadmsg}")
+                            
+                            operators[recipient].sendall(cadmsg.encode('utf-8'))
 
+                            try:
+                                resp = operators[recipient].recv(4)
+                            except OSError as e:
+                                resp = None
+
+                            if resp and resp.decode('utf-8').rstrip() == "OK":
+                                print(f"Message acknowledged by Operator {recipient}")
+                                cadcon.sendall("OK\n".encode('utf-8'))
+
+                            else:
+                                print("Operator {recipient} didn't acknowledge message, closing connection to client")
+                                operators[recipient].shutdown(socket.SHUT_RDWR)
+                                operators[recipient].close()
                                 try:
-                                    resp = operators[recipient].recv(4)
-                                except OSError as e:
-                                    resp = None
+                                    connections.remove(operators[recipient])
+                                    del operators[recipient]
+                                except KeyError:
+                                    pass
 
-                                if resp and resp.decode('utf-8').rstrip() == "OK":
-                                    print(f"Message acknowledged by Operator {recipient}")
-                                    cadcon.sendall("OK\n".encode('utf-8'))
+                                cadcon.sendall("NO\n".encode('utf-8'))
 
-                                else:
-                                    print("Operator {recipient} didn't acknowledge message, closing connection to client")
-                                    operators[recipient].shutdown(socket.SHUT_RDWR)
-                                    operators[recipient].close()
-                                    try:
-                                        connections.remove(operators[recipient])
-                                        del operators[recipient]
-                                    except KeyError:
-                                        pass
-
-                                    cadcon.sendall("NO\n".encode('utf-8'))
-
-                                cadcon.shutdown(socket.SHUT_RDWR)
-                                cadcon.close()
-                                break
+                            cadcon.shutdown(socket.SHUT_RDWR)
+                            cadcon.close()
+                            break
 
                     # Or see that the server closed the connection without finishing
                     else:
@@ -321,7 +324,6 @@ if __name__ == "__main__":
             debug and print("Received interrupt signal, exiting")
             break
 
-        finally:
-            closeall(connections)
 
+    closeall(connections)
     sys.exit(0)

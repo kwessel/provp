@@ -146,15 +146,13 @@ def proqaconnect(name, host, port):
     except OSError as e:
         raise proqaexception(f"Failed to connect to ProQA {name} on {host}:{port}: {e}")
 
-def proqasend(conn, msg):
+def proqasend(name, conn, msg):
     """proqasend() -- Send message to a ProQA application and respond with results
 
     Params:
+    name -- human-friendly name of the application
     conn -- file descriptor of the TCP socket to send to
     msg -- string to send
-    name -- human-friendly name of the application
-    host -- hostname or IP where application is listening
-    port -- TCP port number where application is listening
 
     Throws:
     proqaexception when communication fails with ProQA application
@@ -314,11 +312,11 @@ if __name__ == "__main__":
                         # Did we receive the message terminator?
                         if eomstring in servermsg.decode('utf-8'):
                             # read one more batch
-                            data = servercon.recv(16)
-                            if data:
-                                servermsg+=data
-                                debug and print(f"Received last from pqserver: {data}")
-                                debug and print()
+                            #data = servercon.recv(16)
+                            #if data:
+                                #servermsg+=data
+                                #debug and print(f"Received last from pqserver: {data}")
+                                #debug and print()
                            
                             # Parse out group ID in first char from rest of message
                             groupid=servermsg[0:1].decode("utf-8") 
