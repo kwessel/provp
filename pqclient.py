@@ -34,7 +34,7 @@ serverhost = '167.71.250.119'  #rms. server
 serverport = 6000
 
 # Exceptions to throw
-class proqaexception(Exception):
+class pqexception(Exception):
     pass
 
 def parsecmdline():
@@ -126,8 +126,8 @@ def parsecmdline():
 
     return options
 
-def proqaconnect(name, host, port):
-    """proqaconnect() -- Make connection to specified ProQA application
+def pqconnect(name, host, port):
+    """pqconnect() -- Make connection to specified ProQA application
 
     Params:
     name -- human-friendly name of the application
@@ -135,7 +135,7 @@ def proqaconnect(name, host, port):
     port -- TCP port number where application is listening
 
     Throws:
-    proqaexception when connection can't be established with ProQA application
+    pqexception when connection can't be established with ProQA application
 
     Returns:
     File descriptor of connected TCP socket
@@ -144,10 +144,10 @@ def proqaconnect(name, host, port):
     try:
         return socket.create_connection((host, port))
     except OSError as e:
-        raise proqaexception(f"Failed to connect to ProQA {name} on {host}:{port}: {e}")
+        raise pqexception(f"Failed to connect to ProQA {name} on {host}:{port}: {e}")
 
-def proqasend(name, conn, msg):
-    """proqasend() -- Send message to a ProQA application and respond with results
+def pqsend(name, conn, msg):
+    """pqsend() -- Send message to a ProQA application and respond with results
 
     Params:
     name -- human-friendly name of the application
@@ -155,7 +155,7 @@ def proqasend(name, conn, msg):
     msg -- string to send
 
     Throws:
-    proqaexception when communication fails with ProQA application
+    pqexception when communication fails with ProQA application
 
     Returns:
     None
@@ -165,7 +165,7 @@ def proqasend(name, conn, msg):
         conn.sendall(msg)
         print(f"Data successfully sent to ProQA {name}")
     except OSError as e:
-        raise proqaexception(f"Error sending to ProQA {name}: {e}")
+        raise pqexception(f"Error sending to ProQA {name}: {e}")
 
     return True
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
     print()
 
     # _________________________________________________________________________________________
-    #                              proqa connections - medical, fire, police
+    #                              ProQA connections - medical, fire, police
     # _________________________________________________________________________________________
     medcon = None
     fircon = None
@@ -279,9 +279,9 @@ if __name__ == "__main__":
 
     try:
         #  connect to medical, fire, police 
-        medcon = proqaconnect("Med", options.medhost, options.medport)
-        fircon = proqaconnect("Fire", options.firhost, options.firport)
-        polcon = proqaconnect("Police", options.polhost, options.polport)
+        medcon = pqconnect("Med", options.medhost, options.medport)
+        fircon = pqconnect("Fire", options.firhost, options.firport)
+        polcon = pqconnect("Police", options.polhost, options.polport)
 
         # Wait for a connection
         while True:
@@ -348,10 +348,10 @@ if __name__ == "__main__":
                             # If group ID was valid, send message
                             if name:
                                 try:
-                                    proqasend(name, conn, senddata)
-                                except proqaexception as e:
+                                    pqsend(name, conn, senddata)
+                                except pqexception as e:
                                     servercon.sendall("NO\n".encode('utf-8'))
-                                    raise proqaexception(e)
+                                    raise pqexception(e)
 
                                 servercon.sendall("OK\n".encode('utf-8'))
                             else:
@@ -382,7 +382,7 @@ if __name__ == "__main__":
                         medmsg = ""
                 # Or see that the server closed the connection
                 else:
-                    raise proqaexception("ProQA med has closed the connection")
+                    raise pqexception("ProQA med has closed the connection")
                 
             # fire - post to cad via catchpro_url
             if fircon in rlist:
@@ -397,7 +397,7 @@ if __name__ == "__main__":
 
                 # Or see that the server closed the connection
                 else:
-                    raise proqaexception("ProQA fire has closed the connection")
+                    raise pqexception("ProQA fire has closed the connection")
 
             # police - post to cad via catchpro_url
             if polcon in rlist:
@@ -412,16 +412,17 @@ if __name__ == "__main__":
 
                 # Or see that the server closed the connection
                 else:
-                    raise proqaexception("ProQA police has closed the connection")
+                    raise pqexception("ProQA police has closed the connection")
 
-    except proqaexception as e:
+    except pqexception as e:
         debug and print(f"Exiting: {e}")
         sys.exit(2)
 
     except KeyboardInterrupt:
         debug and print("Received interrupt signal, exiting")
         sys.exit(0)
-    # This runs before the above exceptions always
+
+    # Always close all connections at the end of this block regardless of exceptions
     finally:
         # Close all connections
         closeall([servercon,medcon,fircon,polcon])
