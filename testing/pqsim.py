@@ -8,75 +8,90 @@ import sys
 
 eomstring = "</comm>"
 
-sock51 = socket.create_server(('localhost', 5100), backlog=3)
-print("Socket created, bound and listening on localhost port 5100")
+connections = []
+sock51 = None
+sock52 = None
+sock53 = None
 
-sock52 = socket.create_server(('localhost', 5200), backlog=3)
-print("Socket created, bound and listening on localhost port 5200")
+try:
+    sock51 = socket.create_server(('localhost', 5100), backlog=3)
+    connections.append(sock51)
+    print("Socket created, bound and listening on localhost port 5100")
 
-sock53 = socket.create_server(('localhost', 5300), backlog=3)
-print("Socket created, bound and listening on localhost port 5300")
+    sock52 = socket.create_server(('localhost', 5200), backlog=3)
+    connections.append(sock52)
+    print("Socket created, bound and listening on localhost port 5200")
 
-connections = [sock51, sock52, sock53]
+    sock53 = socket.create_server(('localhost', 5300), backlog=3)
+    connections.append(sock53)
+    print("Socket created, bound and listening on localhost port 5300")
 
-while True:
     # Wait for a connection
-    try:
+    while True:
         rlist = select.select(connections, [], [],0.5)[0]  # only get readable sockets, not writable or error
 
-        for c in rlist:
-            if c == sock51 or c == sock52 or c == sock53:
-                conn, client_address = c.accept()
-                connections.append(conn)
+        for c in connections:
+            if c in rlist:
+                #print(c)
 
-                if c == sock51:
-                    print(f"connection on 5100 from {client_address}", file=sys.stderr)
-                elif c == sock52:
-                    print(f"connection on 5200 from {client_address}", file=sys.stderr)
-                elif c == sock53:
-                    print(f"connection on 5300 from {client_address}", file=sys.stderr)
+                if c == sock51 or c == sock52 or c == sock53:
+                    con, client_address = c.accept()
+                    connections.append(con)
 
-            # Data on an active connection
-            else:
-                fulldata=b''
+                    if c == sock51:
+                        print(f"connection on 5100 from {client_address}", file=sys.stderr)
+                    elif c == sock52:
+                        print(f"connection on 5200 from {client_address}", file=sys.stderr)
+                    elif c == sock53:
+                        print(f"connection on 5300 from {client_address}", file=sys.stderr)
 
-                # Receive the data in small chunks and retransmit it
-                while True:
-                    data = c.recv(16)  # Receive data in chunks of 16 bytes
+                # Data on an active connection
+                else:
+                    print(f"Receiving message from client on {c.getsockname()[1]}")
+                    fulldata=""
 
-                    if data:
-                        fulldata += data  # Accumulate the received data
+                    # Receive the data in small chunks and retransmit it
+                    while True:
+                        data = c.recv(16)  # Receive data in chunks of 16 bytes
 
-                        if eomstring in data.decode('utf-8'):
-                            print("End of Msg received.")
+                        if data:
+                            print(f"received chunk from client on {c.getsockname()[1]}: {data}", file=sys.stderr)
+                            fulldata += data.decode('utf-8')  # Accumulate the received data
 
-                            # Decode the accumulated bytes data and print it as a string
-                            if fulldata:
-                                print(f"Complete message: {fulldata.decode('utf-8')}", file=sys.stderr)
+                            if eomstring in fulldata:
+                                print("End of Msg received.")
 
-                            sendresponse='From Pqsim51: '.encode('utf-8')+fulldata+eomstring.encode('utf-8')
-                            try:
-                                c.sendall(sendresponse)  
-                            except OSError as e:
-                                print(f"Error sending response: {e}")
-                            
-                            break  # Exit the loop
+                                if fulldata:
+                                    print(f"Complete message client on {c.getsockname()[1]}: {fulldata}", file=sys.stderr)
 
-                        print(f"received chunk: {data}", file=sys.stderr)
+                                sendresponse=f"From {c.getsockname()[1]}: {fulldata}{eomstring}".encode('utf-8')
+                                fulldata=""
 
-                    else:
-                        print("Connection closed by client")
-                        c.close()
-                        connections.remove(c)
-                        break
+                                try:
+                                    c.sendall(sendresponse)  
+                                except OSError as e:
+                                    print(f"Error sending response to client on {c.getsockname()[1]}: {e}")
+                                
+                                break  # Exit the loop
 
-    except KeyboardInterrupt:
-        print("Received interrupt signal, exiting")
-        break
 
-# Clean up the connection
-for c in connections:
-    c.close()
+                        else:
+                            print(f"Connection to client on {c.getsockname()[1]} closed by client")
+                            c.close()
+                            connections.remove(c)
+                            break
 
-print("Connections closed")
+except KeyboardInterrupt:
+    print("Received interrupt signal, exiting")
+
+except OSError as e:
+    print(f"Exception: {e}")
+
+finally:
+    # Clean up the connection
+    for c in connections:
+        if c:
+            c.close()
+    print("Connections closed")
+
 sys.exit(0)

@@ -2,7 +2,7 @@
 error_reporting(E_ALL);
 
 $address = 'localhost';
-$service_port = 5001;
+$service_port = 6001;
 
 /* Create a TCP/IP socket. */
 $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
@@ -20,7 +20,7 @@ if ($result === false) {
     echo "OK.\n";
 }
 
-$in = "1\r\nfoo\n";
+$in = "15\nfoo</comm>\n";
 $out = '';
 
 echo "Sending request...";
